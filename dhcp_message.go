@@ -7,21 +7,22 @@ import (
 )
 
 type DHCPMessage struct {
-	OpCode                uint8  `json:"op"`     // 1 byte
-	HardwareType          uint8  `json:"htype"`  // 1 byte
-	HardwareAddressLength uint8  `json:"hlen"`   // 1 byte
-	Hops                  uint8  `json:"hops"`   // 1 byte
-	TransactionID         uint32 `json:"xid"`    // 4 bytes
-	Seconds               uint16 `json:"secs"`   // 2 bytes
-	Flags                 uint16 `json:"flags"`  // 2 bytes
-	ClientIP              uint32 `json:"ciaddr"` // 4 bytes
-	YourIP                uint32 `json:"yiaddr"` // 4 bytes
-	NextServerIP          uint32 `json:"siaddr"` // 4 bytes
-	RelayAgentIP          uint32 `json:"giaddr"` // 4 bytes
-	ClientHardwareAddress []byte `json:"chaddr"` // 16 bytes
-	ServerHostName        []byte `json:"sname"`  // 64 bytes
-	BootFileName          []byte `json:"file"`   // 128 bytes
-	MagicCookie           uint32 `json:"magic"`  // 4 bytes
+	OpCode                uint8           `json:"op"`      // 1 byte
+	HardwareType          uint8           `json:"htype"`   // 1 byte
+	HardwareAddressLength uint8           `json:"hlen"`    // 1 byte
+	Hops                  uint8           `json:"hops"`    // 1 byte
+	TransactionID         uint32          `json:"xid"`     // 4 bytes
+	Seconds               uint16          `json:"secs"`    // 2 bytes
+	Flags                 uint16          `json:"flags"`   // 2 bytes
+	ClientIP              uint32          `json:"ciaddr"`  // 4 bytes
+	YourIP                uint32          `json:"yiaddr"`  // 4 bytes
+	NextServerIP          uint32          `json:"siaddr"`  // 4 bytes
+	RelayAgentIP          uint32          `json:"giaddr"`  // 4 bytes
+	ClientHardwareAddress []byte          `json:"chaddr"`  // 16 bytes
+	ServerHostName        []byte          `json:"sname"`   // 64 bytes
+	BootFileName          []byte          `json:"file"`    // 128 bytes
+	MagicCookie           uint32          `json:"magic"`   // 4 bytes
+	Options               map[byte][]byte `json:"options"` // DHCP options
 }
 
 // Serialize serializes the DHCPMessage into a byte slice with error handling.
@@ -105,6 +106,26 @@ func (m *DHCPMessage) Serialize() ([]byte, error) {
 	if err := write(m.MagicCookie, FieldMagicCookie); err != nil {
 		return nil, err
 	}
+
+	// Add DHCP options
+	if m.Options != nil {
+		for code, value := range m.Options {
+			if code == OptionPad || code == OptionEnd {
+				continue // Skip pad and end options
+			}
+
+			if len(value) > 255 {
+				return nil, fmt.Errorf("option %d too long: %d bytes", code, len(value))
+			}
+
+			buf.WriteByte(code)
+			buf.WriteByte(byte(len(value)))
+			buf.Write(value)
+		}
+	}
+
+	// Add end option
+	buf.WriteByte(OptionEnd)
 
 	return buf.Bytes(), nil
 }
