@@ -7,7 +7,6 @@ import (
 )
 
 func createUDPSendSocket() (*net.UDPConn, error) {
-	// laddr, err := net.ResolveUDPAddr("udp", ":68")
 	raddr, err := net.ResolveUDPAddr("udp", "255.255.255.255:67")
 	if err != nil {
 		return nil, err
