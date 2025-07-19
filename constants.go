@@ -32,6 +32,8 @@ const (
 	OptionDHCPMessageType      = 53
 	OptionClientIdentifier     = 61
 	OptionParameterRequestList = 55
+	OptionRequestedIPAddress   = 50
+	OptionServerIdentifier     = 54
 	OptionEnd                  = 255
 	OptionPad                  = 0
 )
@@ -41,5 +43,9 @@ const (
 	DHCPDiscover = 1
 	DHCPOffer    = 2
 	DHCPRequest  = 3
+	DHCPDecline  = 4
 	DHCPAck      = 5
+	DHCPNak      = 6
+	DHCPRelease  = 7
+	DHCPInform   = 8
 )

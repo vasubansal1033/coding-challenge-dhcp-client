@@ -209,6 +209,30 @@ func Deserialize(data []byte) (*DHCPMessage, error) {
 		return nil, err
 	}
 
+	m.Options = make(map[byte][]byte)
+	for {
+		code, err := buf.ReadByte()
+		if err != nil {
+			break
+		}
+
+		if code == OptionEnd {
+			break
+		}
+
+		length, err := buf.ReadByte()
+		if err != nil {
+			break
+		}
+
+		value := make([]byte, length)
+		if _, err := buf.Read(value); err != nil {
+			return nil, fmt.Errorf("failed to read option value: %w", err)
+		}
+
+		m.Options[code] = value
+	}
+
 	return m, nil
 }
 
@@ -348,6 +372,8 @@ func (m *DHCPMessage) optionCodeString(code byte) string {
 		return "Domain Search"
 	case 121:
 		return "Classless Static Route"
+	case 125:
+		return "Vendor-Identifying Vendor-Specific Information"
 	case 249:
 		return "Private/Classless Static Route (Microsoft)"
 	case 252:
@@ -387,7 +413,12 @@ func (m *DHCPMessage) optionValueString(code byte, value []byte) string {
 		if len(value) == 4 {
 			ip := binary.BigEndian.Uint32(value)
 			return m.ipToString(ip)
+		} else if len(value) == 8 {
+			ip1 := binary.BigEndian.Uint32(value[:4])
+			ip2 := binary.BigEndian.Uint32(value[4:])
+			return fmt.Sprintf("%s, %s", m.ipToString(ip1), m.ipToString(ip2))
 		}
+
 		return fmt.Sprintf("%v", value)
 	case 51, 58, 59: // Time values
 		if len(value) == 4 {
@@ -408,6 +439,8 @@ func (m *DHCPMessage) optionValueString(code byte, value []byte) string {
 			params = append(params, m.optionCodeString(param))
 		}
 		return strings.Join(params, ", ")
+	case 125: // Vendor-Identifying Vendor-Specific Information
+		return fmt.Sprintf("'%s'", string(value))
 	default:
 		if len(value) == 0 {
 			return "Empty"
