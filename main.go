@@ -113,7 +113,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Received DHCP message: %+v\n", dhcpMessage)
+	fmt.Printf("Received DHCP message:\n%s", dhcpMessage.String())
 
 	// Check if it's a DHCPOFFER
 	if msgType, exists := dhcpMessage.Options[OptionDHCPMessageType]; exists && len(msgType) > 0 {
