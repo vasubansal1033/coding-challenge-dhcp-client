@@ -128,7 +128,7 @@ func (c *DHCPClient) createDHCPDiscover() *DHCPMessage {
 		Hops:                  0,
 		TransactionID:         c.transactionID,
 		Seconds:               0,
-		Flags:                 0,
+		Flags:                 0x8000, // Broadcast flag
 		ClientHardwareAddress: make([]byte, 16),
 		ServerHostName:        make([]byte, 64),
 		BootFileName:          make([]byte, 128),
@@ -156,7 +156,7 @@ func (c *DHCPClient) createDHCPRequest(offerMsg *DHCPMessage) *DHCPMessage {
 		Hops:                  0,
 		TransactionID:         c.transactionID, // Same transaction ID
 		Seconds:               0,
-		Flags:                 0,
+		Flags:                 0x8000, // Broadcast flag
 		ClientHardwareAddress: make([]byte, 16),
 		ServerHostName:        make([]byte, 64),
 		BootFileName:          make([]byte, 128),

@@ -3,12 +3,12 @@ package main
 import "net"
 
 func createUDPSendSocket() (*net.UDPConn, error) {
-	raddr, err := net.ResolveUDPAddr("udp", "255.255.255.255:67")
+	raddr, err := net.ResolveUDPAddr("udp4", "255.255.255.255:67")
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := net.DialUDP("udp", nil, raddr)
+	conn, err := net.DialUDP("udp4", nil, raddr)
 	if err != nil {
 		return nil, err
 	}
@@ -17,12 +17,12 @@ func createUDPSendSocket() (*net.UDPConn, error) {
 }
 
 func createUDPReceiveSocket() (*net.UDPConn, error) {
-	addr, err := net.ResolveUDPAddr("udp", ":68")
+	addr, err := net.ResolveUDPAddr("udp4", ":68")
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := net.ListenUDP("udp", addr)
+	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil {
 		return nil, err
 	}

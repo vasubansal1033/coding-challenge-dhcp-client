@@ -104,7 +104,59 @@ On my machine I sometimes hit a timeout waiting for DHCPOFFER. That was not alwa
 
 - Port 68 already in use by the OS DHCP client
 - No DHCP server on the network (e.g. testing on a network without one)
-- Need broadcast flag (`0x8000`) in some environments (still on my list to verify)
+- Missing broadcast flag (`0x8000`) in the DHCP header — see the section below
+
+## The Broadcast Flag Bug (and Why My Old Router "Just Worked")
+
+When I came back to this project a year later, the client timed out waiting for DHCPOFFER. I spent time chasing the wrong things — hardcoded MAC address, socket binding, whether my refactor broke something. None of that was the real issue.
+
+The actual bug was `Flags: 0` in my DISCOVER and REQUEST packets. I had left it at zero since the first working version in July 2025.
+
+### What the broadcast flag actually does
+
+DHCP messages have a 16-bit `flags` field in the fixed header. Only the top bit matters for this: **bit 15**, the broadcast flag.
+
+- **`0x0000` (flag = 0)** — tells the server: "please send your reply (OFFER, ACK, etc.) as a **unicast** to my MAC and the IP you are offering me."
+- **`0x8000` (flag = 1)** — tells the server: "please **broadcast** your reply to `255.255.255.255` on the local subnet."
+
+The client always broadcasts its DISCOVER, because it does not have an IP yet. But the server's reply can go either way depending on this flag.
+
+### Why unicast replies are a problem for an unconfigured client
+
+Here is the catch that took me a while to internalize. A unicast OFFER is sent to the IP address the server *wants* to give you — but you have not accepted it yet. Your stack may not be listening for traffic destined to that address. Worse, the server may need your MAC via ARP to deliver the unicast, and you are not fully set up as that host yet.
+
+Broadcasting the OFFER sidesteps that. Everyone on the subnet sees it, including a client sitting on `0.0.0.0` with only a UDP socket on port 68. That is why RFC 2131 treats the broadcast flag as the client's way of saying "I cannot reliably receive unicast yet."
+
+### The server still has the final say
+
+The flag is a **preference**, not a command. Enterprise gear, relays, and different firmware builds may ignore it and unicast anyway, or broadcast regardless. That is why the same client code can behave differently on different networks without you changing a line.
+
+I found this explained well in a few places when I went looking: [Super User on the BOOTP broadcast flag](https://superuser.com/questions/472594/dhcp-broadcast-flag), [RFC 2131](https://datatracker.ietf.org/doc/html/rfc2131), and vendor docs from Juniper/Cisco/Huawei that describe how OFFER delivery changes based on the flag.
+
+### What happened on my networks
+
+When I first got DISCOVER/OFFER working, I was almost certainly on an **ACT Fibe** router from around 2017. That box seemed happy to send OFFERs even when my client left `flags` at zero. I assumed the code was done.
+
+A year later, on a **Jio** router from 2025, the same binary just sat there until timeout. I proved it with a quick Python script on the same machine:
+
+- DISCOVER with `flags = 0` → silence
+- DISCOVER with `flags = 0x8000` → OFFER from `192.168.29.1` within a second
+
+So the code did not rot. The DHCP server got stricter. The Jio router appears to honour the flag properly: no broadcast bit, no OFFER delivered in a way my client could hear.
+
+My best guess for the ACT router: older, more forgiving firmware that broadcast OFFERs during DISCOVER no matter what the client asked for. Plenty of home routers from that era behaved that way.
+
+### The fix
+
+Set `Flags: 0x8000` in both `createDHCPDiscover()` and `createDHCPRequest()` in `dhcp_client.go`. After that, the full exchange worked on the Jio network.
+
+I also switched the receive socket from `"udp", ":68"` to `"udp4", "0.0.0.0:68"` because on macOS the generic bind can land on `[::]:68`, which is a footgun for an IPv4-only protocol like DHCP.
+
+### What I learned from this
+
+Do not assume "it worked once" means the packet was correct. I got lucky on a lenient router. A proper DHCP client should set the broadcast flag whenever `ciaddr` is `0.0.0.0` and the client does not yet have a working address — which is exactly the DISCOVER and REQUEST case.
+
+If you are debugging a timeout, check the flags field in a wire capture before you blame your MAC address.
 
 ## What I Still Need to Do
 
@@ -119,8 +171,7 @@ Right now the client prints the assigned IP but does not actually configure the 
 ## Things I Would Improve Later
 
 - Random transaction ID per run
-- Broadcast flag in DISCOVER/REQUEST for clients without an IP yet
-- `SO_REUSEADDR` / `SO_BROADCAST` on sockets
+- `SO_REUSEADDR` / `SO_BROADCAST` on sockets (Go may set broadcast for `255.255.255.255` dials, but worth being explicit)
 - Pick network interface by name instead of hardcoded MAC
 - Renewal (T1/T2 timers from lease options)
 
